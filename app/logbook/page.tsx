@@ -79,7 +79,9 @@ export default function Record() {
               src={log.image}
               style={{
                 marginTop: "15px",
-                maxWidth: "100%",
+                width: "100%",
+                height: "auto"
+
               }}
             />
           )}
