@@ -8,9 +8,14 @@ import {
   orderBy,
   query,
   Timestamp,
+  deleteDoc,
+  doc,
+  updateDoc,
 } from "firebase/firestore";
+import { getAuth, onAuthStateChanged, User } from "firebase/auth";
 
 interface Log {
+  id: string;
   action: string;
   content?: string;
   image?: string;
@@ -18,31 +23,66 @@ interface Log {
   timestamp: Timestamp;
 }
 
-
 export default function Record() {
   const [logs, setLogs] = useState<Log[]>([]);
+  const [user, setUser] = useState<User | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editAction, setEditAction] = useState("");
+  const [editContent, setEditContent] = useState("");
+
+  const auth = getAuth();
 
   useEffect(() => {
-    async function fetchLogs() {
-      const q = query(
-        collection(db, "logs"),
-        orderBy("timestamp", "desc")
-      );
-
-      const snapshot = await getDocs(q);
-      const data = snapshot.docs.map((doc) => doc.data() as Log);
-      setLogs(data);
-    }
+    onAuthStateChanged(auth, (u) => {
+      setUser(u);
+    });
 
     fetchLogs();
   }, []);
+
+  async function fetchLogs() {
+    const q = query(
+      collection(db, "logs"),
+      orderBy("timestamp", "desc")
+    );
+
+    const snapshot = await getDocs(q);
+
+    const data = snapshot.docs.map((docSnap) => ({
+      id: docSnap.id,
+      ...(docSnap.data() as Omit<Log, "id">),
+    }));
+
+    setLogs(data);
+  }
+
+  async function handleDelete(id: string) {
+    await deleteDoc(doc(db, "logs", id));
+    fetchLogs();
+  }
+
+  function startEdit(log: Log) {
+    setEditingId(log.id);
+    setEditAction(log.action);
+    setEditContent(log.content || "");
+  }
+
+  async function saveEdit(id: string) {
+    await updateDoc(doc(db, "logs", id), {
+      action: editAction,
+      content: editContent,
+    });
+
+    setEditingId(null);
+    fetchLogs();
+  }
 
   return (
     <div>
       <h1>Record</h1>
 
-      {logs.map((log, index) => (
-        <div className="glass" key={index}>
+      {logs.map((log) => (
+        <div className="glass" key={log.id}>
           <div
             style={{
               fontSize: "0.75rem",
@@ -58,32 +98,76 @@ export default function Record() {
               .slice(0, 16)}
           </div>
 
-          <h3 style={{
-  fontWeight: log.type === "entry" ? 600 : 400,
-  letterSpacing: log.type === "entry" ? "0px" : "0.5px",
-  textTransform: log.type === "system" ? "uppercase" : "none",
-  opacity: log.type === "system" ? 0.6 : 1
-}}>
-  {log.action}
-</h3>
+          {editingId === log.id ? (
+            <>
+              <input
+                value={editAction}
+                onChange={(e) => setEditAction(e.target.value)}
+              />
 
+              <textarea
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+              />
 
-          {log.content && (
-            <p style={{ marginTop: "12px" }}>
-              {log.content}
-            </p>
-          )}
+              <button onClick={() => saveEdit(log.id)}>
+                Save
+              </button>
+              <button
+                onClick={() => setEditingId(null)}
+                style={{ marginLeft: "10px" }}
+              >
+                Cancel
+              </button>
+            </>
+          ) : (
+            <>
+              <h3>{log.action}</h3>
 
-          {log.image && (
-            <img
-              src={log.image}
-              style={{
-                marginTop: "15px",
-                width: "100%",
-                height: "auto"
+              {log.content && (
+                <p style={{ marginTop: "12px" }}>
+                  {log.content}
+                </p>
+              )}
 
-              }}
-            />
+              {log.image && (
+                <img
+                  src={log.image}
+                  style={{
+                    width: "100%",
+                    height: "auto",
+                    marginTop: "15px",
+                  }}
+                />
+              )}
+
+              {user && (
+                <div
+                  style={{
+                    marginTop: "15px",
+                    fontSize: "0.75rem",
+                    opacity: 0.6,
+                  }}
+                >
+                  <span
+                    style={{
+                      cursor: "pointer",
+                      marginRight: "20px",
+                    }}
+                    onClick={() => startEdit(log)}
+                  >
+                    EDIT
+                  </span>
+
+                  <span
+                    style={{ cursor: "pointer" }}
+                    onClick={() => handleDelete(log.id)}
+                  >
+                    DELETE
+                  </span>
+                </div>
+              )}
+            </>
           )}
         </div>
       ))}

@@ -12,7 +12,7 @@ import {
   doc,
   updateDoc,
 } from "firebase/firestore";
-import { addLog } from "../../lib/firestore";
+import { getAuth, onAuthStateChanged, User } from "firebase/auth";
 
 interface Project {
   id: string;
@@ -23,9 +23,20 @@ interface Project {
 
 export default function Portfolio() {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [user, setUser] = useState<User | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
+
+  const auth = getAuth();
+
+  useEffect(() => {
+    onAuthStateChanged(auth, (u) => {
+      setUser(u);
+    });
+
+    fetchProjects();
+  }, []);
 
   async function fetchProjects() {
     const q = query(
@@ -43,13 +54,8 @@ export default function Portfolio() {
     setProjects(data);
   }
 
-  useEffect(() => {
-    fetchProjects();
-  }, []);
-
-  async function handleDelete(id: string, title: string) {
+  async function handleDelete(id: string) {
     await deleteDoc(doc(db, "projects", id));
-    await addLog(`Deleted portfolio entry: ${title}`);
     fetchProjects();
   }
 
@@ -64,8 +70,6 @@ export default function Portfolio() {
       title: editTitle,
       description: editDescription,
     });
-
-    await addLog(`Updated portfolio entry: ${editTitle}`);
 
     setEditingId(null);
     fetchProjects();
@@ -107,11 +111,10 @@ export default function Portfolio() {
                 style={{
                   fontSize: "0.75rem",
                   opacity: 0.5,
-                  marginTop: "6px",
                   fontFamily: "monospace",
+                  marginTop: "6px",
                 }}
               >
-                CREATED:{" "}
                 {project.createdAt
                   ?.toDate()
                   .toISOString()
@@ -122,32 +125,32 @@ export default function Portfolio() {
                 {project.description}
               </p>
 
-              <div
-                style={{
-                  marginTop: "20px",
-                  fontSize: "0.75rem",
-                  opacity: 0.6,
-                }}
-              >
-                <span
+              {user && (
+                <div
                   style={{
-                    cursor: "pointer",
-                    marginRight: "20px",
+                    marginTop: "15px",
+                    fontSize: "0.75rem",
+                    opacity: 0.6,
                   }}
-                  onClick={() => startEdit(project)}
                 >
-                  EDIT
-                </span>
+                  <span
+                    style={{
+                      cursor: "pointer",
+                      marginRight: "20px",
+                    }}
+                    onClick={() => startEdit(project)}
+                  >
+                    EDIT
+                  </span>
 
-                <span
-                  style={{ cursor: "pointer" }}
-                  onClick={() =>
-                    handleDelete(project.id, project.title)
-                  }
-                >
-                  DELETE
-                </span>
-              </div>
+                  <span
+                    style={{ cursor: "pointer" }}
+                    onClick={() => handleDelete(project.id)}
+                  >
+                    DELETE
+                  </span>
+                </div>
+              )}
             </>
           )}
         </div>
