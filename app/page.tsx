@@ -66,7 +66,7 @@ export default function Home() {
     <div>
       {/* HERO */}
       <section style={{ marginBottom: "100px" }}>
-        <h1>Mujtaba Bilal</h1>
+        <h1>Mujtaba Bin Bilal</h1>
         <p>Systems win.</p>
       </section>
 
