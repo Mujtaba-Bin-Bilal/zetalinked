@@ -13,12 +13,36 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { getAuth, onAuthStateChanged, User } from "firebase/auth";
+import type { ReactNode } from "react";
 
 interface Project {
   id: string;
   title: string;
   description: string;
   createdAt: Timestamp;
+}
+
+/* ---------- link parser (future-proof for research logs) ---------- */
+function linkify(text: string): ReactNode {
+  const splitRegex = /(https?:\/\/[^\s]+)/g;
+  const testRegex = /^https?:\/\/[^\s]+$/;
+
+  return text.split(splitRegex).map((part, i) => {
+    if (testRegex.test(part)) {
+      return (
+        <a
+          key={i}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ textDecoration: "underline", opacity: 0.9 ,color:"#7dd3fc"}}
+        >
+          {part}
+        </a>
+      );
+    }
+    return part;
+  });
 }
 
 export default function Portfolio() {
@@ -31,11 +55,13 @@ export default function Portfolio() {
   const auth = getAuth();
 
   useEffect(() => {
-    onAuthStateChanged(auth, (u) => {
+    const unsub = onAuthStateChanged(auth, (u) => {
       setUser(u);
     });
 
     fetchProjects();
+
+    return () => unsub(); // ✅ prevents listener leak
   }, []);
 
   async function fetchProjects() {
@@ -93,9 +119,8 @@ export default function Portfolio() {
                 onChange={(e) => setEditDescription(e.target.value)}
               />
 
-              <button onClick={() => saveEdit(project.id)}>
-                Save
-              </button>
+              <button onClick={() => saveEdit(project.id)}>Save</button>
+
               <button
                 onClick={() => setEditingId(null)}
                 style={{ marginLeft: "10px" }}
@@ -107,6 +132,7 @@ export default function Portfolio() {
             <>
               <h2>{project.title}</h2>
 
+              {/* ✅ LOCAL DATE (fixes phantom previous-day bug) */}
               <div
                 style={{
                   fontSize: "0.75rem",
@@ -117,12 +143,11 @@ export default function Portfolio() {
               >
                 {project.createdAt
                   ?.toDate()
-                  .toISOString()
-                  .slice(0, 10)}
+                  .toLocaleDateString("en-CA")}
               </div>
 
               <p style={{ marginTop: "18px" }}>
-                {project.description}
+                {linkify(project.description)}
               </p>
 
               {user && (
@@ -134,10 +159,7 @@ export default function Portfolio() {
                   }}
                 >
                   <span
-                    style={{
-                      cursor: "pointer",
-                      marginRight: "20px",
-                    }}
+                    style={{ cursor: "pointer", marginRight: "20px" }}
                     onClick={() => startEdit(project)}
                   >
                     EDIT
