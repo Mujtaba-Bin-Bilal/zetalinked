@@ -12,26 +12,34 @@ export default function Home() {
   const [activity, setActivity] = useState<Record<string, number>>({});
 
   useEffect(() => {
-    async function fetchLogs() {
-      const snapshot = await getDocs(collection(db, "logs"));
+  async function fetchActivity() {
+    const dailyCounts: Record<string, number> = {};
 
-      const dailyCounts: Record<string, number> = {};
+    const [logsSnap, projectsSnap] = await Promise.all([
+      getDocs(collection(db, "logs")),
+      getDocs(collection(db, "projects")),
+    ]);
 
-      snapshot.forEach((doc) => {
-        const data = doc.data() as Log;
+    const process = (snapshot: any) => {
+      snapshot.forEach((doc: any) => {
+        const data = doc.data();
         if (!data.timestamp) return;
 
         const date = data.timestamp.toDate();
-        const key = date.toISOString().split("T")[0];
+        const key = date.toLocaleDateString("en-CA");
 
         dailyCounts[key] = (dailyCounts[key] || 0) + 1;
       });
+    };
 
-      setActivity(dailyCounts);
-    }
+    process(logsSnap);
+    process(projectsSnap);
 
-    fetchLogs();
-  }, []);
+    setActivity(dailyCounts);
+  }
+
+  fetchActivity();
+}, []);
 
   function generateDays() {
     const days = [];
